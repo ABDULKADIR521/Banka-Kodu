@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Para Yönetim Sistemi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 50px;
+        }
+        input, button {
+            margin: 10px 0;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #transactionMessage {
+            white-space: pre-line;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>AKADİRBANK</h1>
+
+    <div>
+        <h3>Para Ekle</h3>
+        <input type="text" id="addCardCode" placeholder="Kart Kodu Girin">
+        <input type="number" id="addAmount" placeholder="Miktar girin">
+        <button onclick="addMoney()">Para Ekle</button>
+    </div>
+
+    <div>
+        <h3>Para Çek</h3>
+        <input type="text" id="normalCardCode" placeholder="Kart Kodu Girin">
+        <input type="number" id="normalWithdrawAmount" placeholder="Çekilecek Miktar">
+        <input type="password" id="withdrawPin" placeholder="PIN Kodu (gerekirse)">
+        <button onclick="normalWithdraw()">Para Çek</button>
+    </div>
+
+    <div>
+        <h3>POS Cihazı</h3>
+        <input type="text" id="companyName" placeholder="Şirket Adı">
+        <input type="text" id="productName" placeholder="Alınan Ürün İsmi">
+        <input type="text" id="posCardCode" placeholder="Kart Kodu Girin">
+        <input type="number" id="posWithdrawAmount" placeholder="Çekilecek Miktar">
+        <input type="password" id="posWithdrawPin" placeholder="PIN Kodu (gerekirse)">
+        <button onclick="posWithdraw()">Para Çek</button>
+        <button onclick="posRefund()">Para İade</button>
+    </div>
+
+    <div>
+        <h3>Para Transferi</h3>
+        <input type="text" id="transferFromCardCode" placeholder="Gönderen Kart Kodu">
+        <input type="text" id="transferToCardCode" placeholder="Alıcı Kart Kodu">
+        <input type="number" id="transferAmount" placeholder="Miktar girin">
+        <input type="password" id="transferPin" placeholder="PIN Kodu (gerekirse)">
+        <button onclick="transferMoney()">Para Transferi</button>
+    </div>
+
+    <div>
+        <h3>Bakiyeyi Kontrol Et</h3>
+        <input type="text" id="checkCardCode" placeholder="Kart Kodu Girin">
+        <button onclick="checkBalance()">Bakiyeyi Göster</button>
+        <p id="balanceMessage"></p>
+    </div>
+
+    <div>
+        <h3>Yapılan İşlemler</h3>
+        <input type="text" id="transactionCardCode" placeholder="Kart Kodu Girin">
+        <button onclick="showTransactions()">İşlemleri Göster</button>
+        <button onclick="resetTransactionMessage()">Yeni İşlem</button>
+        <p id="transactionMessage"></p>
+    </div>
+
+    <p id="message"></p>
+
+    <script>
+        const accounts = {
+            "201604012756": { balance: 0, transactions: [] },
+            "PLY00131697": { balance: 0, transactions: [] }
+        };
+
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); // Nokta ekleme
+        }
+
+        function censorCardCode(cardCode) {
+            return cardCode.slice(0, 4) + '****' + cardCode.slice(-4);
+        }
+
+        function addMoney() {
+            const cardCode = document.getElementById('addCardCode').value;
+            const amount = parseFloat(document.getElementById('addAmount').value);
+
+            if (accounts[cardCode]) {
+                if (amount > 0) {
+                    accounts[cardCode].balance += amount;
+                    accounts[cardCode].transactions.push({ company: 'AKADİRBANK Para Ekleme', amount });
+                    document.getElementById('message').textContent = `${formatNumber(amount)} TL eklendi!`;
+                    resetFields();
+                } else {
+                    document.getElementById('message').textContent = 'Lütfen geçerli bir miktar girin.';
+                }
+            } else {
+                document.getElementById('message').textContent = 'Geçersiz kart kodu.';
+            }
+        }
+
+        function normalWithdraw() {
+            const cardCode = document.getElementById('normalCardCode').value;
+            const amount = parseFloat(document.getElementById('normalWithdrawAmount').value);
+            const pin = document.getElementById('withdrawPin').value;
+
+            if (accounts[cardCode]) {
+                if (amount > 0 && amount <= accounts[cardCode].balance) {
+                    accounts[cardCode].balance -= amount;
+                    accounts[cardCode].transactions.push({ company: 'AKADİRBANK Para Çekme', amount });
+                    document.getElementById('message').textContent = `${formatNumber(amount)} TL çekildi!`;
+                    resetFields();
+                } else if (amount > accounts[cardCode].balance && pin === '1234') {
+                    accounts[cardCode].balance -= amount;
+                    accounts[cardCode].transactions.push({ company: 'AKADİRBANK Eksiye Çekme', amount });
+                    document.getElementById('message').textContent = `${formatNumber(amount)} TL eksiye çekildi!`;
+                    resetFields();
+                } else {
+                    document.getElementById('message').textContent = 'Yetersiz bakiye veya geçersiz miktar.';
+                }
+            } else {
+                document.getElementById('message').textContent = 'Geçersiz kart kodu.';
+            }
+        }
+
+        function posWithdraw() {
+            const companyName = document.getElementById('companyName').value.trim();
+            const productName = document.getElementById('productName').value.trim();
+            const cardCode = document.getElementById('posCardCode').value;
+            const amount = parseFloat(document.getElementById('posWithdrawAmount').value);
+            const pin = document.getElementById('posWithdrawPin').value;
+
+            if (!companyName || !productName) {
+                document.getElementById('message').textContent = 'Şirket adı ve ürün ismini boş bırakamazsınız.';
+                return;
+            }
+
+            if (accounts[cardCode]) {
+                if (amount > 0 && amount <= accounts[cardCode].balance) {
+                    accounts[cardCode].balance -= amount;
+                    accounts[cardCode].transactions.push({ company: companyName, product: productName, amount });
+                    document.getElementById('message').textContent = `${formatNumber(amount)} TL ${companyName} üzerinden ${productName} için çekildi!`;
+                    resetFields();
+                } else if (amount > accounts[cardCode].balance && pin === '1234') {
+                    accounts[cardCode].balance -= amount;
+                    accounts[cardCode].transactions.push({ company: companyName, product: productName, amount });
+                    document.getElementById('message').textContent = `${formatNumber(amount)} TL ${companyName} üzerinden ${productName} için eksiye çekildi!`;
+                    resetFields();
+                } else {
+                    document.getElementById('message').textContent = 'Yetersiz bakiye veya geçersiz miktar.';
+                }
+            } else {
+                document.getElementById('message').textContent = 'Geçersiz kart kodu.';
+            }
+        }
+
+        function posRefund() {
+            const companyName = document.getElementById('companyName').value.trim();
+            const productName = document.getElementById('productName').value.trim();
+            const cardCode = document.getElementById('posCardCode').value;
+            const amount = parseFloat(document.getElementById('posWithdrawAmount').value);
+
+            if (!companyName || !productName) {
+                document.getElementById('message').textContent = 'Şirket adı ve ürün ismini boş bırakamazsınız.';
+                return;
+            }
+
+            if (accounts[cardCode]) {
+                if (amount > 0) {
+                    accounts[cardCode].balance += amount;
+                    accounts[cardCode].transactions.push({ company: companyName, product: productName, amount: -amount });
+                    document.getElementById('message').textContent = `${formatNumber(amount)} TL ${companyName} üzerinden ${productName} için iade edildi!`;
+                    resetFields();
+                } else {
+                    document.getElementById('message').textContent = 'Lütfen geçerli bir miktar girin.';
+                }
+            } else {
+                document.getElementById('message').textContent = 'Geçersiz kart kodu.';
+            }
+        }
+
+        function transferMoney() {
+            const fromCardCode = document.getElementById('transferFromCardCode').value;
+            const toCardCode = document.getElementById('transferToCardCode').value;
+            const amount = parseFloat(document.getElementById('transferAmount').value);
+            const pin = document.getElementById('transferPin').value;
+
+            if (accounts[fromCardCode] && accounts[toCardCode]) {
+                if (amount > 0 && amount <= accounts[fromCardCode].balance) {
+                    accounts[fromCardCode].balance -= amount;
+                    accounts[toCardCode].balance += amount;
+                    accounts[fromCardCode].transactions.push({ company: 'Para Transferi', amount: -amount, to: toCardCode });
+                    accounts[toCardCode].transactions.push({ company: 'Para Transferi', amount, from: fromCardCode });
+
+                    const censoredFrom = censorCardCode(fromCardCode);
+                    const censoredTo = censorCardCode(toCardCode);
+
+                    document.getElementById('message').textContent = `${formatNumber(amount)} TL, ${censoredFrom} den ${censoredTo} ye transfer edildi!`;
+                    resetFields();
+                } else {
+                    document.getElementById('message').textContent = 'Yetersiz bakiye veya geçersiz miktar.';
+                }
+            } else {
+                document.getElementById('message').textContent = 'Geçersiz kart kodu.';
+            }
+        }
+
+        function checkBalance() {
+            const cardCode = document.getElementById('checkCardCode').value;
+
+            if (accounts[cardCode]) {
+                const balance = formatNumber(accounts[cardCode].balance.toFixed(2));
+                const censoredCode = censorCardCode(cardCode);
+                document.getElementById('balanceMessage').textContent = `${censoredCode} kartının bakiyesi: ${balance} TL`;
+                setTimeout(() => {
+                    document.getElementById('balanceMessage').textContent = '';
+                }, 60000);
+                resetFields();
+            } else {
+                document.getElementById('balanceMessage').textContent = 'Geçersiz kart kodu.';
+            }
+        }
+
+        function showTransactions() {
+            const cardCode = document.getElementById('transactionCardCode').value;
+
+            if (accounts[cardCode]) {
+                const transactions = accounts[cardCode].transactions;
+                if (transactions.length === 0) {
+                    document.getElementById('transactionMessage').textContent = 'Hiç işlem yapılmamış.';
+                } else {
+                    document.getElementById('transactionMessage').textContent =
+                        'Yapılan İşlemler:\n' + transactions.map((tx, index) => {
+                            const fromCensored = tx.from ? censorCardCode(tx.from) : '';
+                            const toCensored = tx.to ? censorCardCode(tx.to) : '';
+                            return `${index + 1}. ${tx.company}: ${formatNumber(tx.amount)} TL${tx.from ? ' (Gönderen: ' + fromCensored + ' | Alıcı: ' + toCensored + ')' : ''}`;
+                        }).join('\n');
+                }
+                resetFields();
+            } else {
+                document.getElementById('transactionMessage').textContent = 'Geçersiz kart kodu.';
+            }
+        }
+
+        function resetTransactionMessage() {
+            document.getElementById('transactionMessage').textContent = '';
+            resetFields();
+        }
+
+        function resetFields() {
+            document.getElementById('addCardCode').value = '';
+            document.getElementById('addAmount').value = '';
+            document.getElementById('normalCardCode').value = '';
+            document.getElementById('normalWithdrawAmount').value = '';
+            document.getElementById('withdrawPin').value = '';
+            document.getElementById('companyName').value = '';
+            document.getElementById('productName').value = '';
+            document.getElementById('posCardCode').value = '';
+            document.getElementById('posWithdrawAmount').value = '';
+            document.getElementById('posWithdrawPin').value = '';
+            document.getElementById('checkCardCode').value = '';
+            document.getElementById('transactionCardCode').value = '';
+            document.getElementById('transferFromCardCode').value = '';
+            document.getElementById('transferToCardCode').value = '';
+            document.getElementById('transferAmount').value = '';
+            document.getElementById('transferPin').value = '';
+        }
+    </script>
+</body>
+</html>
